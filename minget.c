@@ -256,7 +256,8 @@ fs_copy_file_to_stream(const struct fs *fs,
 
             if (ind1) {
                 zone = ind1[idx];
-            } else {
+            }
+            else {
                 /* No indirect block allocated: this whole region is a hole. */
                 zone = 0;
             }
@@ -286,17 +287,16 @@ fs_copy_file_to_stream(const struct fs *fs,
                 } 
                 else {
                     /* Load or reuse second-level table for this l1. */
-                    if (!dbl2 || dbl2_index != l1) {
+                    if (dbl2_index != l1) {
                         long off = fs->fs_offset +
                                    (long)l2_zone * fs->zonesize;
 
+                        dbl2 = malloc(ind_bytes);
                         if (!dbl2) {
-                            dbl2 = malloc(ind_bytes);
-                            if (!dbl2) {
-                                fprintf(stderr, "malloc dbl2\n");
-                                goto done;
-                            }
+                            fprintf(stderr, "malloc dbl2\n");
+                            goto done;
                         }
+                            
                         if (fseek(fs->fp, off, SEEK_SET) != 0) {
                             perror("fseek dbl2");
                             goto done;
