@@ -1,5 +1,8 @@
-/* minix_fs.c – shared code for minls and minget */
-
+/* 
+ * minix_fs.c – shared code for minls and minget.
+ * Provides MINIX filesystem parsing: partitions, superblock, inodes,
+ * directory traversal, and file reading (including indirect blocks).
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,14 +10,11 @@
 #include <unistd.h>
 #include "minix_fs.h"
 
-
-/* For getopt (not declared in <unistd.h> in strict C90 mode) */
+/* For getopt */
+extern int getopt(int argc, char * const argv[], const char *optstring);
 extern int opterr;
 extern int optind;
 extern char *optarg;
-
-
-
 
 static void
 usage_minls(void)
@@ -45,12 +45,14 @@ usage_minget(void)
 }
 
 
-/* need_path_args:
-*  for minls: 0 or 1 (path optional)
-*  for minget: 1 or 2 (src required, dst optional)
-*
-* rest will point to remaining argv (imagefile + path(s)).
-*/
+/*
+ * parse_common_options:
+ *   Parse shared command-line options for minls and minget.
+ *   Fills in 'opt' with verbose/partition/subpartition flags and
+ *   leaves *rest pointing at the remaining argv (imagefile + paths).
+ *   'need_path_args' is not enforced here; each main() does its own
+ *   argument validation after this call.
+ */
 int
 parse_common_options(int argc, char **argv,
                     struct options *opt,
@@ -68,7 +70,7 @@ parse_common_options(int argc, char **argv,
    opt->subpart = 0;
 
 
-   opterr = 0; /* we’ll print messages ourselves */
+   opterr = 0; 
 
 
    while ((c = getopt(argc, argv, "vp:s:h")) != -1) {
@@ -98,18 +100,17 @@ parse_common_options(int argc, char **argv,
 
    *rest = &argv[optind];
 
-
-   /* We don’t strictly enforce need_path_args here because
-    * minls can be called with just imagefile.
-    * Each main() should validate arguments after this call.
-    */
    return 0;
 }
 
 
 /* ----- Low-level helpers for partition reading ----- */
 
-
+/* 
+ * read_boot_signature:
+ *   Verify the 0x55AA boot sector signature at 'base' in the image.
+ *   Returns 0 on success, -1 on error or invalid signature.
+ */
 static int
 read_boot_signature(FILE *fp, long base)
 {
@@ -131,7 +132,11 @@ read_boot_signature(FILE *fp, long base)
    return 0;
 }
 
-
+/*
+ * read_partition_entry:
+ *   Read partition table entry 'index' (0–3) from table at 'base'.
+ *   Returns 0 on success, -1 on error or invalid index.
+ */
 static int
 read_partition_entry(FILE *fp, long base, int index,
                     struct partition_entry *p)
@@ -160,7 +165,12 @@ read_partition_entry(FILE *fp, long base, int index,
 
 /* ----- Superblock + inode helpers ----- */
 
-
+/*
+ * fs_read_super:
+ *   Read and validate the MINIX superblock for the current filesystem.
+ *   The superblock is always at byte offset 1024 from fs->fs_offset.
+ *   On success, initializes fs->sb, fs->blocksize, and fs->zonesize.
+ */
 int
 fs_read_super(struct fs *fs, int verbose)
 {
@@ -206,102 +216,97 @@ fs_read_super(struct fs *fs, int verbose)
    return 0;
 }
 
-
+/*
+ * fs_init:
+ *   Initialize an fs context for a given image file and options.
+ *   Handles unpartitioned images, primary partitions (-p), and
+ *   subpartitions (-s) before reading the MINIX superblock.
+ */
 int
 fs_init(struct fs *fs, FILE *fp, const struct options *opt, int verbose)
 {
-   struct partition_entry p;
-   long base = 0;  /* start of "current" partition in bytes */
+    struct partition_entry p;
+    long base = 0;  /* start of "current" partition in bytes */
 
+    memset(fs, 0, sizeof(*fs));
+    fs->fp = fp;
+    fs->fs_offset = 0;
 
-   memset(fs, 0, sizeof(*fs));
-   fs->fp = fp;
-   fs->fs_offset = 0;
+    /* Unpartitioned image: just read superblock directly. */
+    if (!opt->have_partition && !opt->have_subpartition) {
+        if (fs_read_super(fs, verbose) < 0)
+            return -1;
+        return 0;
+    }
 
+    /* Step 1: read primary partition table from MBR */
+    if (read_boot_signature(fp, 0) < 0)
+        return -1;
 
-   /* Unpartitioned image: just read superblock directly. */
-   if (!opt->have_partition && !opt->have_subpartition) {
-       if (fs_read_super(fs, verbose) < 0)
-           return -1;
-       return 0;
-   }
+    if (opt->have_partition) {
+        if (read_partition_entry(fp, 0, opt->part, &p) < 0)
+            return -1;
 
+        if (p.type != MINIX_PARTTYPE) {
+            fprintf(stderr,
+                "Partition %d is not a MINIX partition "
+                "(type 0x%02x)\n",
+                opt->part, p.type);
+            return -1;
+        }
 
-   /* Step 1: read primary partition table from MBR */
-   if (read_boot_signature(fp, 0) < 0)
-       return -1;
+        base = (long)p.lFirst * SECTOR_SIZE;
+        if (verbose) {
+            fprintf(stderr,
+                "Partition %d: lFirst=%u size=%u  -> base=%ld\n",
+                opt->part, p.lFirst, p.size, base);
+        }
+    }
 
+    /* Step 2: if subpartition requested, read its table inside primary */
+    if (opt->have_subpartition) {
+        struct partition_entry sub;
 
-   if (opt->have_partition) {
-       if (read_partition_entry(fp, 0, opt->part, &p) < 0)
-           return -1;
+        if (read_boot_signature(fp, base) < 0)
+            return -1;
 
+        if (read_partition_entry(fp, base, opt->subpart, &sub) < 0)
+            return -1;
 
-           if (p.type != MINIX_PARTTYPE) {
-               fprintf(stderr,
-                   "Partition %d is not a MINIX partition "
-                   "(type 0x%02x)\n",
-                   opt->part, p.type);
-           return -1;
-       }
+        if (sub.type != MINIX_PARTTYPE) {
+            fprintf(stderr,
+                "Subpartition %d is not a MINIX partition "
+                "(type 0x%02x)\n",
+                opt->subpart, sub.type);
+            return -1;
+        }
 
+        if (verbose) {
+            fprintf(stderr, "  Subpartition %d: lFirst=%u size=%u\n",
+                    opt->subpart, sub.lFirst, sub.size);
+        }
 
+        /* IMPORTANT: lFirst is absolute, from start of disk. */
+        base = (long)sub.lFirst * SECTOR_SIZE;
+    }
 
+    fs->fs_offset = base;
 
-       base = (long)p.lFirst * SECTOR_SIZE;
-       if (verbose) {
-           fprintf(stderr, "Partition %d: lFirst=%u size=%u  -> base=%ld\n",
-                   opt->part, p.lFirst, p.size, base);
-       }
-   }
+    if (fs_read_super(fs, verbose) < 0)
+        return -1;
 
-
-   /* Step 2: if subpartition requested, read its table inside primary */
-   if (opt->have_subpartition) {
-       struct partition_entry sub;
-
-
-       if (read_boot_signature(fp, base) < 0)
-           return -1;
-
-
-       if (read_partition_entry(fp, base, opt->subpart, &sub) < 0)
-           return -1;
-
-
-           if (sub.type != MINIX_PARTTYPE) {
-               fprintf(stderr,
-                   "Subpartition %d is not a MINIX partition "
-                   "(type 0x%02x)\n",
-                   opt->subpart, sub.type);
-           return -1;
-       }
-
-
-
-
-       if (verbose) {
-           fprintf(stderr, "  Subpartition %d: lFirst=%u size=%u\n",
-                   opt->subpart, sub.lFirst, sub.size);
-       }
-       base += (long)sub.lFirst * SECTOR_SIZE;
-   }
-
-
-   fs->fs_offset = base;
-
-
-   if (fs_read_super(fs, verbose) < 0)
-       return -1;
-
-
-   return 0;
+    return 0;
 }
+
 
 
 /* ----- Inode access ----- */
 
-
+/*
+ * fs_get_inode:
+ *   Load inode 'inum' from the inode table into *ino.
+ *   Computes the inode table location from the superblock fields.
+ */
 int
 fs_get_inode(const struct fs *fs, uint32_t inum, struct inode *ino)
 {
@@ -387,7 +392,16 @@ fs_perm_string(const struct inode *ino, char *out)
    out[10] = '\0';
 }
 
-
+/*
+ * scan_dir_zone:
+ *   Scan up to 'to_read' bytes of directory entries starting at 'base'.
+ *   If list_mode == 0, look for 'name' and return:
+ *      1 on found (out_inum set),
+ *      0 on not found,
+ *     -1 on error.
+ *   If list_mode == 1, ignore 'name' and print each non-empty entry.
+ *   'remaining' is decremented by DIR_ENTRY_SIZE for each entry visited.
+ */
 void
 fs_print_inode_verbose(const struct inode *ino)
 {
@@ -468,14 +482,15 @@ scan_dir_zone(const struct fs *fs,
    return 0;  /* not found / done with this zone */
 }
 
-
-
-
-
-
-/* Read all dirents from a directory inode and search for a given name.
-* Returns child inode number on success, 0 if not found, -1 on error.
-*/
+/*
+ * dir_lookup:
+ *   Search the directory inode 'dir_ino' for entry 'name'.
+ *   Returns:
+ *     1 if found (*out_inum set),
+ *     0 if not found,
+ *    -1 on error.
+ *   Scans all direct zones, then any single-indirect zones.
+ */
 static int
 dir_lookup(const struct fs *fs,
           const struct inode *dir_ino,
@@ -592,9 +607,7 @@ dir_lookup(const struct fs *fs,
 
 
 
-/* Normalize path: treat NULL/"" as "/", strip extra slashes, etc.
-* This is intentionally very simple; you can improve it if you like.
-*/
+/* canonicalize_path: treat NULL/"" as "/", strip extra slashes, etc. */
 void
 canonicalize_path(const char *in, char *out, size_t outsz)
 {
@@ -643,8 +656,12 @@ canonicalize_path(const char *in, char *out, size_t outsz)
 }
 
 
-
-
+/*
+ * fs_find_path:
+ *   Resolve 'path' starting from the root inode (1).
+ *   Uses canonicalize_path + dir_lookup to walk each component.
+ *   On success, fills *ino and *inum with the final inode.
+ */
 int
 fs_find_path(const struct fs *fs, const char *path,
             struct inode *ino, uint32_t *inum)
@@ -706,9 +723,11 @@ fs_find_path(const struct fs *fs, const char *path,
    return 0;
 }
 
-
-
-
+/*
+ * fs_list_dir:
+ *   List the contents of directory inode 'dir_ino' in long format.
+ *   Prints one line per entry: "perm size name".
+ */
 int
 fs_list_dir(const struct fs *fs, const char *path,
            const struct inode *dir_ino)

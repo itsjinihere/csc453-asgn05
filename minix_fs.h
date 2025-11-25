@@ -54,7 +54,7 @@ struct __attribute__((packed)) partition_entry {
 };
 
 
-/* Minix V3 superblock (from assignment) */
+/* Minix superblock */
 struct __attribute__((packed)) superblock {
    uint32_t ninodes;
    uint16_t pad1;
@@ -119,7 +119,7 @@ struct fs {
 /* Option parsing helpers */
 int parse_common_options(int argc, char **argv,
                         struct options *opt,
-                        int need_path_args, /* 1 or 2, depending on program */
+                        int need_path_args,
                         char ***rest);
 
 
@@ -134,7 +134,6 @@ int   fs_list_dir(const struct fs *fs, const char *path,
 int   fs_is_dir(const struct inode *ino);
 int   fs_is_regular(const struct inode *ino);
 void  fs_print_inode_verbose(const struct inode *ino);
-/* out buffer must be 11 bytes including NUL */
 void  fs_perm_string(const struct inode *ino, char *out);
 
 

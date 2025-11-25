@@ -1,11 +1,13 @@
-/* minls.c */
-
+/* 
+ * minls.c
+ *   Implementation of the minls utility: list directories or file info
+ *   from a MINIX filesystem image using the shared minix_fs.c helpers.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "minix_fs.h"
-
 
 int
 main(int argc, char **argv)
@@ -61,39 +63,38 @@ main(int argc, char **argv)
    }
 
 
-   /* Canonicalize for printing */
-   canonicalize_path(path, canon, sizeof(canon));
+    /* Canonicalize for printing */
+    canonicalize_path(path, canon, sizeof(canon));
 
+    /* Drop leading '/' for printing file names, except for root itself. */
+    printpath = canon;
+    if (strcmp(canon, "/") != 0 && canon[0] == '/') {
+        printpath = canon + 1;
+    }
 
-   /* Drop leading '/' for printing, except for root itself */
-   printpath = canon;
-   if (strcmp(canon, "/") != 0 && canon[0] == '/') {
-       printpath = canon + 1;
-   }
+    /* If verbose, print inode info to stderr */
+    if (opt.verbose) {
+        fs_print_inode_verbose(&ino);
+    }
 
+    if (fs_is_dir(&ino)) {
+        /*
+         * Directories: header should include the leading '/'.
+         * e.g., "/Files:", "/DeepPaths/...:", "/Deleted:".
+         */
+        printf("%s:\n", canon);
+        fs_list_dir(&fs, canon, &ino); 
+    } else {
+        /* Single file listing: keep your original printpath behavior. */
+        fs_perm_string(&ino, perm);
+        printf("%s %9u %s\n",
+               perm,
+               (unsigned int)ino.size,
+               printpath);
+    }
 
-   /* If verbose, print inode info to stderr */
-   if (opt.verbose) {
-       fs_print_inode_verbose(&ino);
-   }
-
-
-   if (fs_is_dir(&ino)) {
-       /* Print canonical directory path with colon, then contents */
-       printf("%s:\n", printpath);
-       fs_list_dir(&fs, printpath, &ino);
-   } else {
-       /* Single file listing */
-       fs_perm_string(&ino, perm);
-       printf("%s %9u %s\n",
-              perm,
-              (unsigned int)ino.size,
-              printpath);
-   }
-
-
-   fclose(fp);
-   return 0;
+    fclose(fp);
+    return 0;
 }
 
 

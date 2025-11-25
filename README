@@ -1,0 +1,96 @@
+CPE 453 – Assignment 05
+Partner Names: 
+    Sreerenjini Surendran Namboothiri (snamboot)
+    Katie Slobodsky (kslobods)
+    Juan E Cisneros (jcisne23)
+
+Description
+-----------
+This assignment implements the `minls` and `minget` utilities for reading
+MINIX Version 3 filesystem images. Both programs share common filesystem
+code in `minix_fs.c` and use the interfaces defined in `minix_fs.h`.
+
+`minls` lists the contents of a directory inside a MINIX filesystem
+image, similar to `ls -l`.  
+`minget` copies a file out of a MINIX filesystem image and writes it
+either to stdout or to a specified output file.
+
+Files
+-----
+Makefile
+    Builds `minls` and `minget` using the flags:
+    `-Wall -ansi -pedantic -g`.
+
+minix_fs.h
+    Header file shared by both programs. Defines structures, constants,
+    and function prototypes for the filesystem reader.
+
+minix_fs.c
+    Shared filesystem code. Handles:
+        - Option parsing
+        - Reading the partition table
+        - Detecting and validating MINIX partitions
+        - Superblock parsing
+        - Inode lookup and path traversal
+        - Directory listing helper functions
+        - File reading, including holes, indirect blocks, and
+          double-indirect blocks
+    This file is used by both `minls` and `minget`.
+
+minls.c
+    Implementation of the `minls` utility:
+        - Parses arguments
+        - Canonicalizes paths
+        - Looks up the target inode
+        - Prints directory contents or file metadata
+
+minget.c
+    Implementation of the `minget` utility:
+        - Parses arguments
+        - Finds the target file
+        - Copies file contents to stdout or a destination file
+
+How to Build
+------------
+Run:
+
+    make
+
+This produces:
+    ./minls
+    ./minget
+
+To clean object files:
+
+    make clean
+
+How to Run
+----------
+List root directory of an unpartitioned image:
+
+    ./minls TestImage
+
+List a path inside the filesystem:
+
+    ./minls TestImage /src
+
+List with verbose information:
+
+    ./minls -v TestImage
+
+Work inside a primary partition:
+
+    ./minls -p 0 HardDisk
+
+Work inside a subpartition:
+
+    ./minls -p 0 -s 2 HardDisk /home/pnico/Message
+
+Extract a file:
+
+    ./minget TestImage /Hello > out.txt
+
+Extract to stdout:
+
+    ./minget TestImage /Hello /dev/stdout
+
