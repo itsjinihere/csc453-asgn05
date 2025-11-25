@@ -39,7 +39,8 @@ main(int argc, char **argv)
    imagefile = rest[0];
    if (rest[1] != NULL) {
        path = rest[1];
-   } else {
+   } 
+   else {
        path = "/";  /* default */
    }
 
@@ -84,7 +85,8 @@ main(int argc, char **argv)
          */
         printf("%s:\n", canon);
         fs_list_dir(&fs, canon, &ino); 
-    } else {
+    } 
+    else {
         /* Single file listing: keep your original printpath behavior. */
         fs_perm_string(&ino, perm);
         printf("%s %9u %s\n",

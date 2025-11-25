@@ -90,7 +90,8 @@ parse_common_options(int argc, char **argv,
        default:
            if (is_minls) {
                usage_minls();
-           } else {
+           } 
+           else {
                usage_minget();
            }
            exit(EXIT_FAILURE);
@@ -452,7 +453,8 @@ scan_dir_zone(const struct fs *fs,
                    }
                    return 1;  /* found */
                }
-           } else {
+           } 
+           else {
                /* list mode: print entry */
                struct inode child;
                char perm[11];
@@ -637,7 +639,8 @@ canonicalize_path(const char *in, char *out, size_t outsz)
                tmp[j++] = '/';
                last_was_slash = 1;
            }
-       } else {
+       } 
+       else {
            tmp[j++] = in[i];
            last_was_slash = 0;
        }

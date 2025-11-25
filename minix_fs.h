@@ -17,7 +17,7 @@
 #define MINIX_MAGIC    0x4D5A
 
 
-#define DIRECT_ZONES 7
+#define DIRECT_ZONES   7
 #define DIR_ENTRY_SIZE 64
 
 

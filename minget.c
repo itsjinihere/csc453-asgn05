@@ -85,7 +85,8 @@ main(int argc, char **argv)
            fclose(fp);
            exit(EXIT_FAILURE);
        }
-   } else {
+   } 
+   else {
        /* No dstpath: write raw bytes to stdout. */
        out = stdout;
    }
@@ -248,7 +249,8 @@ fs_copy_file_to_stream(const struct fs *fs,
             /* Direct zones */
             zone = ino->zone[block_index];
 
-        } else if (block_index < DIRECT_ZONES + entries_per_ind) {
+        } 
+        else if (block_index < DIRECT_ZONES + entries_per_ind) {
             /* Single-indirect region */
             uint32_t idx = block_index - DIRECT_ZONES;
 
@@ -259,7 +261,8 @@ fs_copy_file_to_stream(const struct fs *fs,
                 zone = 0;
             }
 
-        } else {
+        } 
+        else {
             /* Double-indirect region */
             uint32_t idx2 = block_index - DIRECT_ZONES - entries_per_ind;
             uint32_t l1 = idx2 / entries_per_ind;  /* index into dbl1 */
@@ -273,13 +276,15 @@ fs_copy_file_to_stream(const struct fs *fs,
             if (!dbl1) {
                 /* No double-indirect table: this whole region is a hole. */
                 zone = 0;
-            } else {
+            } 
+            else {
                 uint32_t l2_zone = dbl1[l1];
 
                 if (l2_zone == 0) {
                     /* This entire second-level block is a hole. */
                     zone = 0;
-                } else {
+                } 
+                else {
                     /* Load or reuse second-level table for this l1. */
                     if (!dbl2 || dbl2_index != l1) {
                         long off = fs->fs_offset +
@@ -328,8 +333,17 @@ fs_copy_file_to_stream(const struct fs *fs,
     rc = 0;
 
 done:
-    if (ind1) free(ind1);
-    if (dbl1) free(dbl1);
-    if (dbl2) free(dbl2);
+    if (ind1) {
+        free(ind1);
+    }
+
+    if (dbl1) {
+        free(dbl1);
+    }
+
+    if (dbl2) {
+        free(dbl2);
+    }
+
     return rc;
 }
