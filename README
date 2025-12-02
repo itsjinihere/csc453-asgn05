@@ -1,96 +1,29 @@
 CPE 453 – Assignment 05
-Partner Names: 
+Partners:
     Sreerenjini Surendran Namboothiri (snamboot)
     Katie Slobodsky (kslobods)
-    Juan E Cisneros (jcisne23)
+    Juan E. Cisneros (jcisne23)
 
 Description
 -----------
-This assignment implements the `minls` and `minget` utilities for reading
-MINIX Version 3 filesystem images. Both programs share common filesystem
-code in `minix_fs.c` and use the interfaces defined in `minix_fs.h`.
-
-`minls` lists the contents of a directory inside a MINIX filesystem
-image, similar to `ls -l`.  
-`minget` copies a file out of a MINIX filesystem image and writes it
-either to stdout or to a specified output file.
+Implements the `minls` and `minget` utilities for MINIX v3 filesystem
+images. Both programs use shared code in `minix_fs.c` for partition
+handling, superblock loading, inode lookup, directory traversal, and
+file reading (including holes and indirect blocks).
 
 Files
 -----
-Makefile
-    Builds `minls` and `minget` using the flags:
-    `-Wall -ansi -pedantic -g`.
+Makefile       – builds minls and minget with required flags  
+minix_fs.h     – shared definitions and prototypes  
+minix_fs.c     – shared filesystem logic  
+minls.c        – lists directories or file metadata  
+minget.c       – extracts regular files to stdout or a specified file
 
-minix_fs.h
-    Header file shared by both programs. Defines structures, constants,
-    and function prototypes for the filesystem reader.
-
-minix_fs.c
-    Shared filesystem code. Handles:
-        - Option parsing
-        - Reading the partition table
-        - Detecting and validating MINIX partitions
-        - Superblock parsing
-        - Inode lookup and path traversal
-        - Directory listing helper functions
-        - File reading, including holes, indirect blocks, and
-          double-indirect blocks
-    This file is used by both `minls` and `minget`.
-
-minls.c
-    Implementation of the `minls` utility:
-        - Parses arguments
-        - Canonicalizes paths
-        - Looks up the target inode
-        - Prints directory contents or file metadata
-
-minget.c
-    Implementation of the `minget` utility:
-        - Parses arguments
-        - Finds the target file
-        - Copies file contents to stdout or a destination file
-
-How to Build
-------------
-Run:
-
+Build
+-----
     make
-
-This produces:
     ./minls
     ./minget
 
-To clean object files:
-
+Clean:
     make clean
-
-How to Run
-----------
-List root directory of an unpartitioned image:
-
-    ./minls TestImage
-
-List a path inside the filesystem:
-
-    ./minls TestImage /src
-
-List with verbose information:
-
-    ./minls -v TestImage
-
-Work inside a primary partition:
-
-    ./minls -p 0 HardDisk
-
-Work inside a subpartition:
-
-    ./minls -p 0 -s 2 HardDisk /home/pnico/Message
-
-Extract a file:
-
-    ./minget TestImage /Hello > out.txt
-
-Extract to stdout:
-
-    ./minget TestImage /Hello /dev/stdout
-
